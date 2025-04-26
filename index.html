@@ -297,14 +297,19 @@ function lazyLoadImage(img) {
   function openLightbox(url) {
     lightbox.style.display = 'flex';
     lightboxImg.src = url;
-    downloadBtn.href = url;
+    // Set download link to the image's URL
+    downloadBtn.href = url;  
+    downloadBtn.download = url.split('/').pop();  // Use the file name for the download
+
+    // Show the lightbox with the download button
+    downloadBtn.style.display = 'block';  // Ensure button is visible
   }
 
   closeLightbox.addEventListener('click', () => {
     lightbox.style.display = 'none';
     lightboxImg.src = '';
-  });
-
+  ));
+  
   // Load gallery on startup
   window.onload = loadGallery;
 </script>
