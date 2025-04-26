@@ -29,16 +29,24 @@
       margin-top: 10px;
     }
 
-    .upload-section button {
-      padding: 10px 20px;
-      margin-top: 15px;
-      background-color: #6b4c3b;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-    }
+.upload-section button {
+  padding: 15px 30px;
+  margin-top: 15px;
+  background: linear-gradient(135deg, #8b5e3c, #6b4c3b);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: background 0.3s, transform 0.2s;
+}
+
+.upload-section button:hover {
+  background: linear-gradient(135deg, #6b4c3b, #4a3225);
+  transform: scale(1.05);
+}
 
     .upload-section button:hover {
       background-color: #5a3e31;
@@ -236,19 +244,20 @@
 
   async function loadGallery() {
     galleryDiv.innerHTML = '';
+    img.loading = 'lazy';
 
     try {
       const listResult = await storageRef.listAll();
-      for (const itemRef of listResult.items) {
-        const url = await itemRef.getDownloadURL();
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = itemRef.name;
-        img.addEventListener('click', () => {
-          openLightbox(url);
-        });
-        galleryDiv.appendChild(img);
-      }
+      for (const item of itemsWithTime) {
+  const img = document.createElement('img');
+  img.src = item.url;
+  img.alt = 'Wedding Photo';
+  img.loading = 'lazy'; // <-- lazy load!
+  img.addEventListener('click', () => {
+    openLightbox(item.url);
+  });
+  galleryDiv.appendChild(img);
+}
     } catch (err) {
       console.error('Error loading gallery:', err);
     }
