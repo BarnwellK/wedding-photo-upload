@@ -2,163 +2,272 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Our Wedding Photos</title>
+  <title>Our Wedding Gallery</title>
   <style>
-    body { font-family: 'Helvetica Neue', sans-serif; background: #f0f0f0; padding: 20px; text-align: center; }
-    h1 { color: #5e4b40; }
-    .upload { margin: 20px 0; }
-    .gallery { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 30px; }
-    .gallery img { width: 200px; height: 200px; object-fit: cover; margin: 10px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-    #status { margin-top: 10px; }
-    .error { color: red; }
-    .success { color: green; }
+    body {
+      margin: 0;
+      font-family: 'Helvetica Neue', sans-serif;
+      background: #fafafa;
+      color: #333;
+      text-align: center;
+    }
+
+    header {
+      background: #6b4c3b;
+      color: white;
+      padding: 20px 0;
+      font-size: 32px;
+      font-weight: bold;
+    }
+
+    .upload-section {
+      margin: 30px 0;
+    }
+
+    .upload-section input[type="file"] {
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    .upload-section button {
+      padding: 10px 20px;
+      margin-top: 15px;
+      background-color: #6b4c3b;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .upload-section button:hover {
+      background-color: #5a3e31;
+    }
+
+    #status {
+      margin-top: 10px;
+    }
+
+    #progress-container {
+      width: 90%;
+      max-width: 400px;
+      height: 20px;
+      background: #ddd;
+      margin: 20px auto;
+      border-radius: 10px;
+      overflow: hidden;
+      display: none;
+    }
+
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #6b4c3b;
+      transition: width 0.3s;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 15px;
+      padding: 20px;
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    .gallery img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      transition: transform 0.2s;
+    }
+
+    .gallery img:hover {
+      transform: scale(1.05);
+    }
+
+    /* Fullscreen Lightbox */
+    .lightbox {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.9);
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 1000;
+    }
+
+    .lightbox img {
+      max-width: 90%;
+      max-height: 80vh;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(255,255,255,0.2);
+    }
+
+    .lightbox button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #6b4c3b;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .lightbox button:hover {
+      background: #5a3e31;
+    }
+
+    .close-lightbox {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      font-size: 40px;
+      color: white;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
-  <h1>Our Wedding Photos</h1>
+<header>
+  Our Wedding Gallery
+</header>
 
-  <div class="upload">
-    <input type="file" id="file-upload" accept="image/*" />
-    <br><br>
-    <button id="upload-button">Upload Photo</button>
-    <p id="status"></p>
+<div class="upload-section">
+  <input type="file" id="file-upload" accept="image/*" />
+  <br>
+  <button id="upload-button">Upload Photo</button>
+  <div id="progress-container">
+    <div id="progress-bar"></div>
   </div>
-<div id="progress-container" style="width: 100%; max-width: 400px; height: 20px; background: #ddd; margin: 20px auto; border-radius: 10px; overflow: hidden; display: none;">
-  <div id="progress-bar" style="height: 100%; width: 0%; background: #6b4c3b; transition: width 0.3s;"></div>
+  <p id="status"></p>
 </div>
-  <div class="gallery" id="gallery"></div>
 
-  <!-- Firebase Scripts -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<div class="gallery" id="gallery"></div>
 
-  <script>
-    // Your Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyAAOqmYEYPjvoxSogDLHNqMS4CoSXfsrgs",
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <span class="close-lightbox" id="close-lightbox">&times;</span>
+  <img id="lightbox-img" src="" alt="Full View">
+  <a id="download-btn" download>
+    <button>Download Photo</button>
+  </a>
+</div>
+
+<!-- Firebase Scripts -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+<script>
+  // Your Firebase config here
+  const firebaseConfig = {
+  apiKey: "AIzaSyAAOqmYEYPjvoxSogDLHNqMS4CoSXfsrgs",
   authDomain: "ken-and-dee-wedding-photos.firebaseapp.com",
   projectId: "ken-and-dee-wedding-photos",
   storageBucket: "ken-and-dee-wedding-photos.firebasestorage.app",
   messagingSenderId: "1071327540442",
   appId: "1:1071327540442:web:2f611f8804bd1bd95761e3"
-    };
+  };
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const storage = firebase.storage();
-    const storageRef = storage.ref('wedding-photos'); // folder name
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const storage = firebase.storage();
+  const storageRef = storage.ref('wedding-photos');
 
-    // Upload Photo
-    document.getElementById('upload-button').addEventListener('click', async () => {
-      const fileInput = document.getElementById('file-upload');
-      const file = fileInput.files[0];
-      if (!file) {
-        alert('Please select a file.');
-        return;
-      }
-
-      const photoRef = storageRef.child(file.name);
-
-      // Check if file exists by trying to get its metadata
-      try {
-        await photoRef.getMetadata();
-        document.getElementById('status').innerHTML = '<span class="error">Photo already exists!</span>';
-      } catch (error) {
-        if (error.code === 'storage/object-not-found') {
-          // Doesn't exist, upload
-          try {
-            await photoRef.put(file);
-            document.getElementById('status').innerHTML = '<span class="success">Uploaded successfully!</span>';
-            loadGallery();
-          } catch (uploadError) {
-            console.error('Upload error:', uploadError);
-            document.getElementById('status').innerHTML = '<span class="error">Upload failed.</span>';
-          }
-        } else {
-          console.error('Metadata check error:', error);
-        }
-      }
-    });
-
-    // Load Gallery
-    async function loadGallery() {
-      const galleryDiv = document.getElementById('gallery');
-      galleryDiv.innerHTML = '';
-
-      try {
-        const listResult = await storageRef.listAll();
-        listResult.items.forEach(async (itemRef) => {
-          const url = await itemRef.getDownloadURL();
-          const img = document.createElement('img');
-          img.src = url;
-          galleryDiv.appendChild(img);
-        });
-      } catch (err) {
-        console.error('Error loading gallery:', err);
-      }
-    }
-
-    // Load on startup
-    window.onload = loadGallery;
-
-
-
-    // Upload Photo
-document.getElementById('upload-button').addEventListener('click', async () => {
-  const fileInput = document.getElementById('file-upload');
-  const file = fileInput.files[0];
   const statusText = document.getElementById('status');
   const progressContainer = document.getElementById('progress-container');
   const progressBar = document.getElementById('progress-bar');
+  const galleryDiv = document.getElementById('gallery');
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImg = document.getElementById('lightbox-img');
+  const closeLightbox = document.getElementById('close-lightbox');
+  const downloadBtn = document.getElementById('download-btn');
 
-  if (!file) {
-    alert('Please select a file.');
-    return;
-  }
+  document.getElementById('upload-button').addEventListener('click', async () => {
+    const fileInput = document.getElementById('file-upload');
+    const file = fileInput.files[0];
+    if (!file) {
+      alert('Please select a file.');
+      return;
+    }
 
-  const photoRef = storageRef.child(file.name);
+    const photoRef = storageRef.child(file.name);
 
-  // Check if file exists by trying to get its metadata
-  try {
-    await photoRef.getMetadata();
-    statusText.innerHTML = '<span class="error">Photo already exists!</span>';
-  } catch (error) {
-    if (error.code === 'storage/object-not-found') {
-      // Doesn't exist, start upload
-      const uploadTask = photoRef.put(file);
+    try {
+      await photoRef.getMetadata();
+      statusText.innerHTML = '<span style="color:red;">Photo already exists!</span>';
+    } catch (error) {
+      if (error.code === 'storage/object-not-found') {
+        const uploadTask = photoRef.put(file);
 
-      // Show the progress bar
-      progressContainer.style.display = 'block';
-      progressBar.style.width = '0%'; // reset bar
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
 
-      uploadTask.on('state_changed',
-        (snapshot) => {
-          // Progress handler
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          statusText.innerHTML = `Uploading... ${progress.toFixed(0)}%`;
-          progressBar.style.width = `${progress}%`;
-        },
-        (error) => {
-          // Error handler
-          console.error('Upload error:', error);
-          statusText.innerHTML = '<span class="error">Upload failed. Please try again.</span>';
-          progressContainer.style.display = 'none'; // hide bar on error
-        },
-        () => {
-          // Success handler
-          statusText.innerHTML = '<span class="success">Uploaded successfully!</span>';
-          progressContainer.style.display = 'none'; // hide bar when done
-          loadGallery(); // refresh gallery
-        }
-      );
-    } else {
-      console.error('Metadata check error:', error);
-      statusText.innerHTML = '<span class="error">Error checking file. Please try again later.</span>';
+        uploadTask.on('state_changed',
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            statusText.innerHTML = `Uploading... ${progress.toFixed(0)}%`;
+            progressBar.style.width = `${progress}%`;
+          },
+          (error) => {
+            console.error('Upload error:', error);
+            statusText.innerHTML = '<span style="color:red;">Upload failed. Please try again.</span>';
+            progressContainer.style.display = 'none';
+          },
+          () => {
+            statusText.innerHTML = '<span style="color:green;">Uploaded successfully!</span>';
+            progressContainer.style.display = 'none';
+            loadGallery();
+          }
+        );
+      } else {
+        console.error('Metadata check error:', error);
+        statusText.innerHTML = '<span style="color:red;">Error checking file.</span>';
+      }
+    }
+  });
+
+  async function loadGallery() {
+    galleryDiv.innerHTML = '';
+
+    try {
+      const listResult = await storageRef.listAll();
+      for (const itemRef of listResult.items) {
+        const url = await itemRef.getDownloadURL();
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = itemRef.name;
+        img.addEventListener('click', () => {
+          openLightbox(url);
+        });
+        galleryDiv.appendChild(img);
+      }
+    } catch (err) {
+      console.error('Error loading gallery:', err);
     }
   }
-});
-  </script>
+
+  function openLightbox(url) {
+    lightbox.style.display = 'flex';
+    lightboxImg.src = url;
+    downloadBtn.href = url;
+  }
+
+  closeLightbox.addEventListener('click', () => {
+    lightbox.style.display = 'none';
+    lightboxImg.src = '';
+  });
+
+  // Load gallery on startup
+  window.onload = loadGallery;
+</script>
 
 </body>
 </html>
