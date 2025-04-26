@@ -234,26 +234,66 @@
     }
   });
 
+
+  // lazy load gallery
   async function loadGallery() {
-    galleryDiv.innerHTML = '';
+  galleryDiv.innerHTML = '';
 
-    try {
-      const listResult = await storageRef.listAll();
-      for (const itemRef of listResult.items) {
-        const url = await itemRef.getDownloadURL();
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = itemRef.name;
-        img.addEventListener('click', () => {
-          openLightbox(url);
-        });
-        galleryDiv.appendChild(img);
-      }
-    } catch (err) {
-      console.error('Error loading gallery:', err);
+  try {
+    const listResult = await storageRef.listAll();
+    const itemsWithTime = [];
+
+    for (const itemRef of listResult.items) {
+      const url = await itemRef.getDownloadURL();
+      const metadata = await itemRef.getMetadata();
+      itemsWithTime.push({
+        url: url,
+        timeCreated: metadata.timeCreated
+      });
     }
-  }
 
+    // Sort by timeCreated DESCENDING (newest first)
+    itemsWithTime.sort((a, b) => new Date(b.timeCreated) - new Date(a.timeCreated));
+
+    // Now create the gallery
+    for (const item of itemsWithTime) {
+      const img = document.createElement('img');
+      img.dataset.src = item.url;  // Use data-src for lazy loading
+      img.alt = 'Wedding Photo';
+      img.classList.add('lazy-load'); // Add a class for styling or identification
+      img.addEventListener('click', () => {
+        openLightbox(item.url);
+      });
+
+      galleryDiv.appendChild(img);
+
+      // Lazy load image when it's in view
+      lazyLoadImage(img);
+    }
+  } catch (err) {
+    console.error('Error loading gallery:', err);
+  }
+}
+
+// IntersectionObserver for lazy loading
+function lazyLoadImage(img) {
+  const observer = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const image = entry.target;
+        image.src = image.dataset.src;  // Set the src from the data-src attribute
+        observer.unobserve(image);  // Stop observing after image is loaded
+      }
+    });
+  }, {
+    rootMargin: '100px', // Load images a bit before they come into view
+  });
+
+  observer.observe(img);  // Observe the image element
+}
+
+
+  // Upload box
   function openLightbox(url) {
     lightbox.style.display = 'flex';
     lightboxImg.src = url;
