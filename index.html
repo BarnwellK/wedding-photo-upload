@@ -156,6 +156,8 @@
 
 <!-- Upload and gallery logic -->
 <script>
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB in bytes
+
   const fileInput = document.getElementById('fileInput');
   const uploadButton = document.getElementById('uploadButton');
   const previewContainer = document.getElementById('previewContainer');
@@ -169,7 +171,22 @@
     fileInput.click();
   });
 
-  fileInput.addEventListener('change', handleFiles);
+  // fileInput.addEventListener('change', handleFiles);
+
+  fileInput.addEventListener("change", (e) => {
+    const files = e.target.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.size > MAX_FILE_SIZE) {
+        alert("File is too large! Please select a file smaller than 50 MB.");
+        fileInput.value = "";  // Clear the file input field
+      } else {
+        // Proceed with upload
+        uploadFile(file);
+      }
+    }
+  });
+  // end of new
 
   function handleFiles() {
     const files = [...fileInput.files];
@@ -182,7 +199,10 @@
     const uploadTask = storageRef.put(file);
 
     uploadTask.on('state_changed', 
-      snapshot => {},
+      snapshot => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        console.log("Upload progress: " + progress + "%");
+      },
       error => {
         console.error('Upload error:', error);
         Toastify({
