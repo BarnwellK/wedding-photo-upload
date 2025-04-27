@@ -2,271 +2,233 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Our Wedding Gallery</title>
+  <title>Ken & Dee's Wedding Gallery</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+
+  <!-- Toastify for upload success/fail notifications -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+  <!-- Lightbox for viewing photos fullscreen -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
+
   <style>
+    /* Body and background */
     body {
       margin: 0;
-      font-family: 'Helvetica Neue', sans-serif;
-      background: #fafafa;
-      color: #333;
-      text-align: center;
+      font-family: 'Segoe UI', sans-serif;
+      
+      background: url('https://images.unsplash.com/photo-1636632519127-c6e09af4a3b5?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center fixed;
+      
+      background-size: cover;
+      background-attachment: fixed;
+      background-color: #fff8f0;
+      min-height: 100vh;
     }
 
+    .overlay {
+      background: rgba(255, 248, 240, 0.90);
+      backdrop-filter: blur(2px);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* Header styling */
     header {
-      background: #6b4c3b;
-      color: white;
-      padding: 20px 0;
-      font-size: 32px;
-      font-weight: bold;
+      text-align: center;
+      padding: 40px 20px 20px;
+      font-family: 'Georgia', serif;
+      color: #bfa060;
     }
 
-    .upload-section {
-      margin: 30px 0;
+    header h1 {
+      margin: 0;
+      font-size: 2.8em;
+      letter-spacing: 2px;
     }
 
-    .upload-section input[type="file"] {
-      padding: 10px;
+    header p {
       margin-top: 10px;
+      font-size: 1.2em;
+      color: #a88b5b;
     }
 
-    .upload-section button {
-      padding: 10px 20px;
-      margin-top: 15px;
-      background-color: #6b4c3b;
+    /* Upload button */
+    .upload-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background-color: #bfa060;
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      font-size: 40px;
       color: white;
       border: none;
-      border-radius: 5px;
       cursor: pointer;
-      font-size: 16px;
-    }
-
-    .upload-section button:hover {
-      background-color: #5a3e31;
-    }
-
-    #status {
-      margin-top: 10px;
-    }
-
-    #progress-container {
-      width: 90%;
-      max-width: 400px;
-      height: 20px;
-      background: #ddd;
-      margin: 20px auto;
-      border-radius: 10px;
-      overflow: hidden;
-      display: none;
-    }
-
-    #progress-bar {
-      height: 100%;
-      width: 0%;
-      background: #6b4c3b;
-      transition: width 0.3s;
-    }
-
-    .gallery {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 15px;
-      padding: 20px;
-      max-width: 1200px;
-      margin: auto;
-    }
-
-    .gallery img {
-      width: 100%;
-      height: 180px;
-      object-fit: cover;
-      border-radius: 10px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      transition: transform 0.2s;
-    }
-
-    .gallery img:hover {
-      transform: scale(1.05);
-    }
-
-    /* Fullscreen Lightbox */
-    .lightbox {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.9);
-      justify-content: center;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      transition: background 0.3s;
+      display: flex;
       align-items: center;
-      flex-direction: column;
+      justify-content: center;
       z-index: 1000;
     }
 
-    .lightbox img {
-      max-width: 90%;
-      max-height: 80vh;
-      margin-bottom: 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 12px rgba(255,255,255,0.2);
+    .upload-btn:hover {
+      background-color: #a88b5b;
     }
 
-    .lightbox button {
-      padding: 10px 20px;
-      font-size: 16px;
-      background: #6b4c3b;
-      color: white;
-      border: none;
-      border-radius: 5px;
+    #fileInput {
+      display: none;
+    }
+
+    /* Gallery container */
+    #previewContainer {
+      margin-top: 40px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .preview-wrapper {
+      position: relative;
+      animation: fadeIn 1s ease forwards;
+    }
+
+    .preview-wrapper img {
+      width: 180px;
+      height: auto;
+      border-radius: 12px;
+      object-fit: cover;
       cursor: pointer;
-      margin-top: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      transition: transform 0.3s;
     }
 
-    .lightbox button:hover {
-      background: #5a3e31;
+    .preview-wrapper img:hover {
+      transform: scale(1.05);
     }
 
-    .close-lightbox {
-      position: absolute;
-      top: 20px;
-      right: 30px;
-      font-size: 40px;
-      color: white;
-      cursor: pointer;
+    /* Animation for new photos */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
+
   </style>
 </head>
+
 <body>
 
-<header>
-  Our Wedding Gallery
-</header>
+<div class="overlay">
+  <header>
+    <h1>Ken & Dee's Wedding Gallery</h1>
+    <p>Thank you for sharing our beautiful day 💛</p>
+  </header>
 
-<div class="upload-section">
-  <input type="file" id="file-upload" accept="image/*" />
-  <br>
-  <button id="upload-button">Upload Photo</button>
-  <div id="progress-container">
-    <div id="progress-bar"></div>
-  </div>
-  <p id="status"></p>
+  <!-- Upload button -->
+  <button id="uploadButton" class="upload-btn">+</button>
+  <input id="fileInput" type="file" multiple>
+
+  <!-- Photo gallery -->
+  <div id="previewContainer"></div>
 </div>
 
-<div class="gallery" id="gallery"></div>
-
-<!-- Lightbox -->
-<div class="lightbox" id="lightbox">
-  <span class="close-lightbox" id="close-lightbox">&times;</span>
-  <img id="lightbox-img" src="" alt="Full View">
-  <a id="download-btn" download>
-    <button>Download Photo</button>
-  </a>
-</div>
-
-<!-- Firebase Scripts -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-
+<!-- Firebase config -->
 <script>
-  // Your Firebase config here
   const firebaseConfig = {
-  apiKey: "AIzaSyAAOqmYEYPjvoxSogDLHNqMS4CoSXfsrgs",
-  authDomain: "ken-and-dee-wedding-photos.firebaseapp.com",
-  projectId: "ken-and-dee-wedding-photos",
-  storageBucket: "ken-and-dee-wedding-photos.firebasestorage.app",
-  messagingSenderId: "1071327540442",
-  appId: "1:1071327540442:web:2f611f8804bd1bd95761e3"
+    apiKey: "AIzaSyAAOqmYEYPjvoxSogDLHNqMS4CoSXfsrgs",
+    authDomain: "ken-and-dee-wedding-photos.firebaseapp.com",
+    projectId: "ken-and-dee-wedding-photos",
+    storageBucket: "ken-and-dee-wedding-photos.firebasestorage.app",
+    messagingSenderId: "1071327540442",
+    appId: "1:1071327540442:web:2f611f8804bd1bd95761e3"
   };
 
-  // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
   const storage = firebase.storage();
-  const storageRef = storage.ref('wedding-photos');
+</script>
 
-  const statusText = document.getElementById('status');
-  const progressContainer = document.getElementById('progress-container');
-  const progressBar = document.getElementById('progress-bar');
-  const galleryDiv = document.getElementById('gallery');
-  const lightbox = document.getElementById('lightbox');
-  const lightboxImg = document.getElementById('lightbox-img');
-  const closeLightbox = document.getElementById('close-lightbox');
-  const downloadBtn = document.getElementById('download-btn');
+<!-- Upload and gallery logic -->
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const uploadButton = document.getElementById('uploadButton');
+  const previewContainer = document.getElementById('previewContainer');
 
-  document.getElementById('upload-button').addEventListener('click', async () => {
-    const fileInput = document.getElementById('file-upload');
-    const file = fileInput.files[0];
-    if (!file) {
-      alert('Please select a file.');
-      return;
-    }
-
-    const photoRef = storageRef.child(file.name);
-
-    try {
-      await photoRef.getMetadata();
-      statusText.innerHTML = '<span style="color:red;">Photo already exists!</span>';
-    } catch (error) {
-      if (error.code === 'storage/object-not-found') {
-        const uploadTask = photoRef.put(file);
-
-        progressContainer.style.display = 'block';
-        progressBar.style.width = '0%';
-
-        uploadTask.on('state_changed',
-          (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            statusText.innerHTML = `Uploading... ${progress.toFixed(0)}%`;
-            progressBar.style.width = `${progress}%`;
-          },
-          (error) => {
-            console.error('Upload error:', error);
-            statusText.innerHTML = '<span style="color:red;">Upload failed. Please try again.</span>';
-            progressContainer.style.display = 'none';
-          },
-          () => {
-            statusText.innerHTML = '<span style="color:green;">Uploaded successfully!</span>';
-            progressContainer.style.display = 'none';
-            loadGallery();
-          }
-        );
-      } else {
-        console.error('Metadata check error:', error);
-        statusText.innerHTML = '<span style="color:red;">Error checking file.</span>';
-      }
-    }
+  const lightbox = GLightbox({
+    touchNavigation: true,
+    loop: true,
   });
 
-  async function loadGallery() {
-    galleryDiv.innerHTML = '';
+  uploadButton.addEventListener('click', () => {
+    fileInput.click();
+  });
 
-    try {
-      const listResult = await storageRef.listAll();
-      for (const itemRef of listResult.items) {
-        const url = await itemRef.getDownloadURL();
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = itemRef.name;
-        img.addEventListener('click', () => {
-          openLightbox(url);
+  fileInput.addEventListener('change', handleFiles);
+
+  function handleFiles() {
+    const files = [...fileInput.files];
+    files.forEach(uploadFile);
+  }
+
+  async function uploadFile(file) {
+    const fileName = Date.now() + '-' + file.name; // Prevent overwriting
+    const storageRef = firebase.storage().ref('wedding-photos/' + fileName);
+    const uploadTask = storageRef.put(file);
+
+    uploadTask.on('state_changed', 
+      snapshot => {},
+      error => {
+        console.error('Upload error:', error);
+        Toastify({
+          text: "Upload failed",
+          backgroundColor: "linear-gradient(to right, #ff5f6d, #ffc371)",
+          duration: 3000
+        }).showToast();
+      },
+      () => {
+        uploadTask.snapshot.ref.getDownloadURL().then(downloadURL => {
+          addPhoto(downloadURL);
+          Toastify({
+            text: "Upload successful!",
+            backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
+            duration: 3000
+          }).showToast();
         });
-        galleryDiv.appendChild(img);
       }
-    } catch (err) {
-      console.error('Error loading gallery:', err);
-    }
+    );
   }
 
-  function openLightbox(url) {
-    lightbox.style.display = 'flex';
-    lightboxImg.src = url;
-    downloadBtn.href = url;
+  function addPhoto(url) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'preview-wrapper';
+    wrapper.innerHTML = `
+      <a href="${url}" class="glightbox" data-gallery="gallery1" data-download="true">
+        <img src="${url}" loading="lazy">
+      </a>
+    `;
+    previewContainer.prepend(wrapper);
+    lightbox.reload();
   }
 
-  closeLightbox.addEventListener('click', () => {
-    lightbox.style.display = 'none';
-    lightboxImg.src = '';
-  });
+  // Load existing photos on page load
+  async function loadPhotos() {
+    const storageRef = firebase.storage().ref('wedding-photos/');
+    const result = await storageRef.listAll();
+    const urls = await Promise.all(result.items.map(item => item.getDownloadURL()));
 
-  // Load gallery on startup
-  window.onload = loadGallery;
+    // Sort by most recent first
+    urls.reverse();
+
+    urls.forEach(url => addPhoto(url));
+  }
+
+  loadPhotos();
 </script>
 
 </body>
