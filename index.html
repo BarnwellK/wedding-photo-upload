@@ -164,7 +164,9 @@
   const previewContainer = document.getElementById('previewContainer');
 
   const lightbox = GLightbox({
+    touchNavigation: true,
     loop: true,
+    draggable: false,
   });
 
   uploadButton.addEventListener('click', () => {
