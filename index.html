@@ -8,22 +8,20 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
 
-  <!-- Toastify for upload success/fail notifications -->
+  <!-- Toastify for upload notifications -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
   <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
-  <!-- Lightbox for viewing photos fullscreen -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
+  <!-- PhotoSwipe -->
+  <link rel="stylesheet" href="https://unpkg.com/photoswipe@5/dist/photoswipe.css">
+  <script src="https://unpkg.com/photoswipe@5/dist/photoswipe.umd.min.js"></script>
+  <script src="https://unpkg.com/photoswipe@5/dist/photoswipe-lightbox.umd.min.js"></script>
 
   <style>
-    /* Body and background */
     body {
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-      
       background: url('https://images.unsplash.com/photo-1636632519127-c6e09af4a3b5?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center fixed;
-      
       background-size: cover;
       background-attachment: fixed;
       background-color: #fff8f0;
@@ -37,7 +35,6 @@
       padding: 20px;
     }
 
-    /* Header styling */
     header {
       text-align: center;
       padding: 40px 20px 20px;
@@ -77,7 +74,6 @@
       z-index: 1000;
     }
 
-
     .upload-btn:hover {
       background-color: #a88b5b;
     }
@@ -86,7 +82,6 @@
       display: none;
     }
 
-    /* Gallery container */
     #previewContainer {
       margin-top: 40px;
       display: flex;
@@ -114,12 +109,17 @@
       transform: scale(1.05);
     }
 
-    /* Animation for new photos */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
+    .pswp__custom-download-button {
+      padding: 8px 10px;
+      color: white;
+      font-size: 18px;
+      text-decoration: none;
+    }
   </style>
 </head>
 
@@ -131,16 +131,12 @@
     <p>Thank you for sharing our beautiful day 💛</p>
   </header>
 
-  <!-- Photo gallery -->
   <div id="previewContainer"></div>
 
-    <!-- Upload button -->
   <button id="uploadButton" class="upload-btn">+</button>
   <input id="fileInput" type="file" multiple>
-
 </div>
 
-<!-- Firebase config -->
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyAAOqmYEYPjvoxSogDLHNqMS4CoSXfsrgs",
@@ -153,27 +149,15 @@
 
   firebase.initializeApp(firebaseConfig);
   const storage = firebase.storage();
-</script>
 
-<!-- Upload and gallery logic -->
-<script>
-  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB in bytes
-
+  const MAX_FILE_SIZE = 50 * 1024 * 1024;
   const fileInput = document.getElementById('fileInput');
   const uploadButton = document.getElementById('uploadButton');
   const previewContainer = document.getElementById('previewContainer');
 
-  const lightbox = GLightbox({
-    //touchNavigation: true,
-    loop: true,
-    draggable: false,
-  });
-
   uploadButton.addEventListener('click', () => {
     fileInput.click();
   });
-
-  // fileInput.addEventListener('change', handleFiles);
 
   fileInput.addEventListener("change", (e) => {
     const files = e.target.files;
@@ -181,26 +165,19 @@
       const file = files[0];
       if (file.size > MAX_FILE_SIZE) {
         alert("File is too large! Please select a file smaller than 50 MB.");
-        fileInput.value = "";  // Clear the file input field
+        fileInput.value = "";
       } else {
-        // Proceed with upload
         uploadFile(file);
       }
     }
   });
-  // end of new
-
-  function handleFiles() {
-    const files = [...fileInput.files];
-    files.forEach(uploadFile);
-  }
 
   async function uploadFile(file) {
-    const fileName = Date.now() + '-' + file.name; // Prevent overwriting
+    const fileName = Date.now() + '-' + file.name;
     const storageRef = firebase.storage().ref('wedding-photos/' + fileName);
     const uploadTask = storageRef.put(file);
 
-    uploadTask.on('state_changed', 
+    uploadTask.on('state_changed',
       snapshot => {
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
         console.log("Upload progress: " + progress + "%");
@@ -230,27 +207,50 @@
     const wrapper = document.createElement('div');
     wrapper.className = 'preview-wrapper';
     wrapper.innerHTML = `
-      <a href="${url}" class="glightbox" data-gallery="gallery1" data-download="true">
+      <a href="${url}" data-pswp-width="1600" data-pswp-height="1067" data-download-url="${url}" target="_blank">
         <img src="${url}" loading="lazy">
       </a>
     `;
     previewContainer.prepend(wrapper);
-    lightbox.reload();
   }
 
-  // Load existing photos on page load
   async function loadPhotos() {
     const storageRef = firebase.storage().ref('wedding-photos/');
     const result = await storageRef.listAll();
     const urls = await Promise.all(result.items.map(item => item.getDownloadURL()));
-
-    // Sort by most recent first
     urls.reverse();
-
     urls.forEach(url => addPhoto(url));
   }
 
   loadPhotos();
+
+  // Initialize PhotoSwipe
+  const lightbox = new PhotoSwipeLightbox({
+    gallery: '#previewContainer',
+    children: 'a',
+    pswpModule: PhotoSwipe
+  });
+
+  lightbox.on('uiRegister', function() {
+    lightbox.pswp.ui.registerElement({
+      name: 'download-button',
+      order: 9,
+      isButton: true,
+      tagName: 'a',
+      html: '⬇️',
+      onInit: (el, pswp) => {
+        el.setAttribute('download', '');
+        el.setAttribute('target', '_blank');
+        el.className = 'pswp__custom-download-button';
+        pswp.on('change', () => {
+          const currSlide = pswp.currSlide;
+          el.href = currSlide.data.downloadURL || currSlide.data.src;
+        });
+      }
+    });
+  });
+
+  lightbox.init();
 </script>
 
 </body>
