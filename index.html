@@ -8,31 +8,34 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
 
-  <!-- Toastify -->
+  <!-- Toastify for upload success/fail notifications -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
   <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
-  <!-- GLightbox -->
+  <!-- Lightbox for viewing photos fullscreen -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
   <script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
 
   <style>
+    /* Body and background */
     body {
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-      background: url('https://images.unsplash.com/photo-1636632519127-c6e09af4a3b5?q=80&w=2070&auto=format&fit=crop') no-repeat center center fixed;
+      background: url('https://images.unsplash.com/photo-1636632519127-c6e09af4a3b5?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center fixed;
       background-size: cover;
+      background-attachment: fixed;
       background-color: #fff8f0;
       min-height: 100vh;
     }
 
     .overlay {
-      background: rgba(255, 248, 240, 0.9);
+      background: rgba(255, 248, 240, 0.90);
       backdrop-filter: blur(2px);
       min-height: 100vh;
       padding: 20px;
     }
 
+    /* Header styling */
     header {
       text-align: center;
       padding: 40px 20px 20px;
@@ -52,45 +55,35 @@
       color: #a88b5b;
     }
 
-    .action-btn {
-      position: fixed;
+    .upload-btn {
+      position: sticky;
       bottom: 30px;
+      right: 30px;
+      background-color: #bfa060;
       width: 70px;
       height: 70px;
       border-radius: 50%;
-      font-size: 30px;
+      font-size: 40px;
       color: white;
       border: none;
       cursor: pointer;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      transition: background 0.3s;
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 1000;
     }
 
-    #uploadButton {
-      right: 30px;
-      background-color: #bfa060;
-    }
-
-    #downloadButton {
-      right: 110px;
-      background-color: #6d9cbe;
-    }
-
-    #uploadButton:hover {
+    .upload-btn:hover {
       background-color: #a88b5b;
-    }
-
-    #downloadButton:hover {
-      background-color: #5c89a9;
     }
 
     #fileInput {
       display: none;
     }
 
+    /* Gallery container */
     #previewContainer {
       margin-top: 40px;
       display: flex;
@@ -118,17 +111,39 @@
       transform: scale(1.05);
     }
 
-    .preview-wrapper.selected img {
-      border: 4px solid #6d9cbe;
-      box-shadow: 0 0 15px rgba(109, 156, 190, 0.7);
-    }
-
+    /* Animation for new photos */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Styles for the download options */
+    #download-options {
+      display: none;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+      color: white;
+      position: absolute;
+    }
+
+    button {
+      padding: 10px;
+      background-color: #bfa060;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      background-color: #a88b5b;
+    }
+
   </style>
 </head>
+
 <body>
 
 <div class="overlay">
@@ -137,61 +152,90 @@
     <p>Thank you for sharing our beautiful day 💛</p>
   </header>
 
+  <!-- Photo gallery -->
   <div id="previewContainer"></div>
 
-  <button id="uploadButton" class="action-btn">+</button>
-  <button id="downloadButton" class="action-btn">↓</button>
+  <!-- Hidden download options -->
+  <div id="download-options">
+    <button id="download-btn">Download</button>
+  </div>
+
+  <!-- Upload button -->
+  <button id="uploadButton" class="upload-btn">+</button>
   <input id="fileInput" type="file" multiple>
 </div>
 
+<!-- Firebase config -->
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyAAOqmYEYPjvoxSogDLHNqMS4CoSXfsrgs",
     authDomain: "ken-and-dee-wedding-photos.firebaseapp.com",
     projectId: "ken-and-dee-wedding-photos",
-    storageBucket: "ken-and-dee-wedding-photos.firebasestorage.com",
+    storageBucket: "ken-and-dee-wedding-photos.firebasestorage.app",
     messagingSenderId: "1071327540442",
     appId: "1:1071327540442:web:2f611f8804bd1bd95761e3"
   };
 
   firebase.initializeApp(firebaseConfig);
   const storage = firebase.storage();
+</script>
+
+<!-- Upload and gallery logic -->
+<script>
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB in bytes
 
   const fileInput = document.getElementById('fileInput');
   const uploadButton = document.getElementById('uploadButton');
-  const downloadButton = document.getElementById('downloadButton');
   const previewContainer = document.getElementById('previewContainer');
+  const lightbox = GLightbox({
+    loop: true,
+    draggable: false,
+  });
 
-  let downloadMode = false;
-
-  const lightbox = GLightbox({ loop: true });
-
-  uploadButton.addEventListener('click', () => fileInput.click());
+  uploadButton.addEventListener('click', () => {
+    fileInput.click();
+  });
 
   fileInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file && file.size <= 50 * 1024 * 1024) {
-      uploadFile(file);
-    } else {
-      alert("Please select a file smaller than 50 MB.");
+    const files = e.target.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.size > MAX_FILE_SIZE) {
+        alert("File is too large! Please select a file smaller than 50 MB.");
+        fileInput.value = "";  // Clear the file input field
+      } else {
+        uploadFile(file);
+      }
     }
   });
 
-  async function uploadFile(file) {
+  function uploadFile(file) {
     const fileName = Date.now() + '-' + file.name;
-    const storageRef = storage.ref('wedding-photos/' + fileName);
+    const storageRef = firebase.storage().ref('wedding-photos/' + fileName);
     const uploadTask = storageRef.put(file);
 
-    uploadTask.on('state_changed',
-      null,
+    uploadTask.on('state_changed', 
+      snapshot => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        console.log("Upload progress: " + progress + "%");
+      },
       error => {
         console.error('Upload error:', error);
-        Toastify({ text: "Upload failed", backgroundColor: "red" }).showToast();
+        Toastify({
+          text: "Upload failed",
+          backgroundColor: "linear-gradient(to right, #ff5f6d, #ffc371)",
+          duration: 3000
+        }).showToast();
       },
-      async () => {
-        const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
-        addPhoto(downloadURL);
-        Toastify({ text: "Upload successful!", backgroundColor: "green" }).showToast();
+      () => {
+        uploadTask.snapshot.ref.getDownloadURL().then(downloadURL => {
+          addPhoto(downloadURL);
+          Toastify({
+            text: "Upload successful!",
+            backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
+            duration: 3000
+          }).showToast();
+        });
       }
     );
   }
@@ -200,84 +244,85 @@
     const wrapper = document.createElement('div');
     wrapper.className = 'preview-wrapper';
     wrapper.innerHTML = `
-      <a href="${url}" class="glightbox" data-gallery="gallery1">
+      <a href="${url}" class="glightbox" data-gallery="gallery1" data-download="true">
         <img src="${url}" loading="lazy">
       </a>
     `;
-
-    wrapper.addEventListener("click", (e) => {
-      if (downloadMode) {
-        e.preventDefault();
-        wrapper.classList.toggle("selected");
-      }
-    });
-
     previewContainer.prepend(wrapper);
     lightbox.reload();
   }
 
+  // Load existing photos on page load
   async function loadPhotos() {
-    const storageRef = storage.ref('wedding-photos/');
+    const storageRef = firebase.storage().ref('wedding-photos/');
     const result = await storageRef.listAll();
-    const items = result.items.reverse();
+    const urls = await Promise.all(result.items.map(item => item.getDownloadURL()));
 
-    for (const item of items) {
-      const url = await item.getDownloadURL();
-      addPhoto(url);
-    }
+    urls.reverse();
+    urls.forEach(url => addPhoto(url));
   }
 
-  async function downloadSelectedPhotos() {
-    const selected = document.querySelectorAll(".preview-wrapper.selected");
-    if (selected.length === 0) {
-      alert("Select at least one photo to download.");
-      return;
-    }
+  loadPhotos();
 
-    for (const wrapper of selected) {
-      const img = wrapper.querySelector("img");
-      const url = img.src;
-      const storageRef = firebase.storage().refFromURL(url);
+  // Add long press functionality for image download
+  let pressTimer;
+  const downloadOptions = document.getElementById('download-options');
+  const downloadButton = document.getElementById('download-btn');
+  let currentImageURL = null;
 
-      try {
-        const downloadURL = await storageRef.getDownloadURL();
-        const metadata = await storageRef.getMetadata();
-        const fileName = metadata.name;
+  // Event listener for touch events to detect long press
+  document.querySelectorAll('.preview-wrapper img').forEach(img => {
+    let isLongPress = false;
 
-        const a = document.createElement("a");
-        a.href = downloadURL;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } catch (err) {
-        console.error("Failed to download:", err);
-      }
-    }
+    img.addEventListener('touchstart', (e) => {
+      isLongPress = false;
+      pressTimer = setTimeout(() => {
+        isLongPress = true;
+        showDownloadOptions(img);
+      }, 800); // 800ms to detect long press
+    });
 
-    exitDownloadMode();
+    img.addEventListener('touchend', (e) => {
+      clearTimeout(pressTimer);
+      if (!isLongPress) return;
+    });
+
+    img.addEventListener('touchmove', (e) => {
+      clearTimeout(pressTimer);
+    });
+  });
+
+  // Show the download options when long press is detected
+  function showDownloadOptions(img) {
+    const rect = img.getBoundingClientRect();
+    downloadOptions.style.top = `${rect.top + window.scrollY + img.height}px`;
+    downloadOptions.style.left = `${rect.left + window.scrollX}px`;
+    downloadOptions.style.display = 'block';
+    currentImageURL = img.src;
   }
 
-  function enterDownloadMode() {
-    downloadMode = true;
-    downloadButton.style.backgroundColor = "#d9534f";
-  }
-
-  function exitDownloadMode() {
-    downloadMode = false;
-    downloadButton.style.backgroundColor = "#6d9cbe";
-    document.querySelectorAll(".preview-wrapper.selected").forEach(el => el.classList.remove("selected"));
-  }
-
-  downloadButton.addEventListener("click", () => {
-    if (!downloadMode) {
-      enterDownloadMode();
-    } else {
-      downloadSelectedPhotos();
+  // Trigger the download of the image
+  downloadButton.addEventListener('click', () => {
+    if (currentImageURL) {
+      downloadImage(currentImageURL);
+      downloadOptions.style.display = 'none';
     }
   });
 
-  loadPhotos();
+  // Function to trigger image download
+  function downloadImage(imageUrl) {
+    const a = document.createElement('a');
+    a.href = imageUrl;
+    a.download = imageUrl.split('/').pop(); // Set the image name from the URL
+    a.click();
+  }
+
+  // Hide download options if clicked outside of the options
+  document.addEventListener('click', (e) => {
+    if (!downloadOptions.contains(e.target)) {
+      downloadOptions.style.display = 'none';
+    }
+  });
 </script>
 
 </body>
