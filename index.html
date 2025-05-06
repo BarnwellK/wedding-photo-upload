@@ -1,3 +1,4 @@
+<!-- Full updated HTML with download mode -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,22 +9,20 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
 
-  <!-- Toastify for upload notifications -->
+  <!-- Toastify -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
   <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
-  <!-- PhotoSwipe -->
-  <link rel="stylesheet" href="https://unpkg.com/photoswipe@5/dist/photoswipe.css">
-  <script src="https://unpkg.com/photoswipe@5/dist/photoswipe.umd.min.js"></script>
-  <script src="https://unpkg.com/photoswipe@5/dist/photoswipe-lightbox.umd.min.js"></script>
+  <!-- GLightbox -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
 
   <style>
     body {
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-      background: url('https://images.unsplash.com/photo-1636632519127-c6e09af4a3b5?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center fixed;
+      background: url('https://images.unsplash.com/photo-1636632519127-c6e09af4a3b5?q=80&w=2070&auto=format&fit=crop') no-repeat center center fixed;
       background-size: cover;
-      background-attachment: fixed;
       background-color: #fff8f0;
       min-height: 100vh;
     }
@@ -54,28 +53,40 @@
       color: #a88b5b;
     }
 
-    .upload-btn {
-      position: sticky;
+    .floating-btn {
+      position: fixed;
       bottom: 30px;
       right: 30px;
-      background-color: #bfa060;
       width: 70px;
       height: 70px;
       border-radius: 50%;
-      font-size: 40px;
+      font-size: 32px;
       color: white;
       border: none;
       cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-      transition: background 0.3s;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      transition: background 0.3s;
       z-index: 1000;
+    }
+
+    .upload-btn {
+      background-color: #bfa060;
     }
 
     .upload-btn:hover {
       background-color: #a88b5b;
+    }
+
+    .download-btn {
+      bottom: 110px;
+      background-color: #6a4f33;
+    }
+
+    .download-btn:hover {
+      background-color: #4a3926;
     }
 
     #fileInput {
@@ -92,39 +103,59 @@
 
     .preview-wrapper {
       position: relative;
-      animation: fadeIn 1s ease forwards;
+      animation: fadeIn 0.6s ease forwards;
     }
 
     .preview-wrapper img {
       width: 180px;
-      height: auto;
       border-radius: 12px;
       object-fit: cover;
       cursor: pointer;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-      transition: transform 0.3s;
+      transition: transform 0.3s, border 0.3s;
     }
 
     .preview-wrapper img:hover {
       transform: scale(1.05);
     }
 
+    .preview-wrapper.selected img {
+      border: 4px solid #ffcc00;
+      box-shadow: 0 0 10px 2px #ffcc00;
+    }
+
+    #confirmDownload {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #333;
+      color: white;
+      text-align: center;
+      padding: 15px;
+      font-size: 16px;
+      z-index: 999;
+    }
+
+    #confirmDownload button {
+      background: #ffcc00;
+      border: none;
+      padding: 10px 20px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 5px;
+      margin-left: 10px;
+    }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
-    }
-
-    .pswp__custom-download-button {
-      padding: 8px 10px;
-      color: white;
-      font-size: 18px;
-      text-decoration: none;
     }
   </style>
 </head>
 
 <body>
-
 <div class="overlay">
   <header>
     <h1>Ken & Dee's Wedding Gallery</h1>
@@ -133,8 +164,14 @@
 
   <div id="previewContainer"></div>
 
-  <button id="uploadButton" class="upload-btn">+</button>
+  <button id="uploadButton" class="floating-btn upload-btn">+</button>
+  <button id="downloadModeButton" class="floating-btn download-btn">⬇️</button>
   <input id="fileInput" type="file" multiple>
+</div>
+
+<div id="confirmDownload">
+  <span id="selectionCount">0 selected</span>
+  <button id="downloadSelected">Download</button>
 </div>
 
 <script>
@@ -150,108 +187,98 @@
   firebase.initializeApp(firebaseConfig);
   const storage = firebase.storage();
 
-  const MAX_FILE_SIZE = 50 * 1024 * 1024;
   const fileInput = document.getElementById('fileInput');
   const uploadButton = document.getElementById('uploadButton');
+  const downloadModeButton = document.getElementById('downloadModeButton');
   const previewContainer = document.getElementById('previewContainer');
+  const confirmDownload = document.getElementById('confirmDownload');
+  const selectionCount = document.getElementById('selectionCount');
+  const downloadSelected = document.getElementById('downloadSelected');
 
-  uploadButton.addEventListener('click', () => {
-    fileInput.click();
-  });
+  let downloadMode = false;
+  const selectedUrls = new Set();
+
+  const lightbox = GLightbox({ loop: true });
+
+  uploadButton.addEventListener('click', () => fileInput.click());
 
   fileInput.addEventListener("change", (e) => {
-    const files = e.target.files;
-    if (files.length > 0) {
-      const file = files[0];
-      if (file.size > MAX_FILE_SIZE) {
-        alert("File is too large! Please select a file smaller than 50 MB.");
-        fileInput.value = "";
-      } else {
-        uploadFile(file);
-      }
+    const file = e.target.files[0];
+    if (file && file.size <= 50 * 1024 * 1024) {
+      uploadFile(file);
+    } else {
+      alert("File is too large. 50MB max.");
     }
   });
 
   async function uploadFile(file) {
     const fileName = Date.now() + '-' + file.name;
-    const storageRef = firebase.storage().ref('wedding-photos/' + fileName);
-    const uploadTask = storageRef.put(file);
-
-    uploadTask.on('state_changed',
-      snapshot => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        console.log("Upload progress: " + progress + "%");
-      },
-      error => {
-        console.error('Upload error:', error);
-        Toastify({
-          text: "Upload failed",
-          backgroundColor: "linear-gradient(to right, #ff5f6d, #ffc371)",
-          duration: 3000
-        }).showToast();
-      },
-      () => {
-        uploadTask.snapshot.ref.getDownloadURL().then(downloadURL => {
-          addPhoto(downloadURL);
-          Toastify({
-            text: "Upload successful!",
-            backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
-            duration: 3000
-          }).showToast();
-        });
-      }
-    );
+    const ref = firebase.storage().ref('wedding-photos/' + fileName);
+    const task = ref.put(file);
+    task.on('state_changed', null, () => {
+      Toastify({ text: "Upload failed", backgroundColor: "#ff5f6d", duration: 3000 }).showToast();
+    }, () => {
+      task.snapshot.ref.getDownloadURL().then(addPhoto);
+      Toastify({ text: "Upload successful!", backgroundColor: "#00b09b", duration: 3000 }).showToast();
+    });
   }
 
   function addPhoto(url) {
     const wrapper = document.createElement('div');
     wrapper.className = 'preview-wrapper';
     wrapper.innerHTML = `
-      <a href="${url}" data-pswp-width="1600" data-pswp-height="1067" data-download-url="${url}" target="_blank">
+      <a href="${url}" class="glightbox" data-gallery="gallery1">
         <img src="${url}" loading="lazy">
       </a>
     `;
+    wrapper.addEventListener('click', e => {
+      if (downloadMode) {
+        e.preventDefault();
+        wrapper.classList.toggle('selected');
+        if (wrapper.classList.contains('selected')) {
+          selectedUrls.add(url);
+        } else {
+          selectedUrls.delete(url);
+        }
+        selectionCount.textContent = `${selectedUrls.size} selected`;
+      }
+    });
     previewContainer.prepend(wrapper);
+    lightbox.reload();
   }
 
   async function loadPhotos() {
-    const storageRef = firebase.storage().ref('wedding-photos/');
-    const result = await storageRef.listAll();
+    const ref = firebase.storage().ref('wedding-photos/');
+    const result = await ref.listAll();
     const urls = await Promise.all(result.items.map(item => item.getDownloadURL()));
-    urls.reverse();
-    urls.forEach(url => addPhoto(url));
+    urls.reverse().forEach(addPhoto);
   }
 
   loadPhotos();
 
-  // Initialize PhotoSwipe
-  const lightbox = new PhotoSwipeLightbox({
-    gallery: '#previewContainer',
-    children: 'a',
-    pswpModule: PhotoSwipe
+  downloadModeButton.addEventListener('click', () => {
+    downloadMode = !downloadMode;
+    document.querySelectorAll('.preview-wrapper').forEach(el => el.classList.remove('selected'));
+    selectedUrls.clear();
+    confirmDownload.style.display = downloadMode ? 'flex' : 'none';
+    selectionCount.textContent = '0 selected';
   });
 
-  lightbox.on('uiRegister', function() {
-    lightbox.pswp.ui.registerElement({
-      name: 'download-button',
-      order: 9,
-      isButton: true,
-      tagName: 'a',
-      html: '⬇️',
-      onInit: (el, pswp) => {
-        el.setAttribute('download', '');
-        el.setAttribute('target', '_blank');
-        el.className = 'pswp__custom-download-button';
-        pswp.on('change', () => {
-          const currSlide = pswp.currSlide;
-          el.href = currSlide.data.downloadURL || currSlide.data.src;
-        });
-      }
+  downloadSelected.addEventListener('click', () => {
+    selectedUrls.forEach(url => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     });
+    downloadMode = false;
+    confirmDownload.style.display = 'none';
+    selectedUrls.clear();
+    document.querySelectorAll('.preview-wrapper').forEach(el => el.classList.remove('selected'));
   });
-
-  lightbox.init();
 </script>
-
 </body>
 </html>
