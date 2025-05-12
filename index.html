@@ -12,15 +12,17 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
   <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
-  <!-- Lightbox -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
+  <!-- PhotoSwipe (Lightbox Replacement) -->
+  <link rel="stylesheet" href="https://unpkg.com/photoswipe@5/dist/photoswipe.css">
+  <script src="https://unpkg.com/photoswipe@5/dist/photoswipe.min.js"></script>
+  <script src="https://unpkg.com/photoswipe@5/dist/photoswipe-lightbox.esm.min.js" type="module"></script>
 
   <style>
+    /* Body and background */
     body {
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-      background: url('https://images.unsplash.com/photo-1636632519127-c6e09af4a3b5?q=80&w=2070&auto=format&fit=crop') no-repeat center center fixed;
+      background: url('https://images.unsplash.com/photo-1636632519127-c6e09af4a3b5?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center fixed;
       background-size: cover;
       background-attachment: fixed;
       background-color: #fff8f0;
@@ -34,6 +36,7 @@
       padding: 20px;
     }
 
+    /* Header styling */
     header {
       text-align: center;
       padding: 40px 20px 20px;
@@ -81,6 +84,7 @@
       display: none;
     }
 
+    /* Gallery container */
     #previewContainer {
       margin-top: 40px;
       display: flex;
@@ -92,10 +96,6 @@
     .preview-wrapper {
       position: relative;
       animation: fadeIn 1s ease forwards;
-    }
-
-    .preview-wrapper a {
-      display: block;
     }
 
     .preview-wrapper img {
@@ -112,9 +112,25 @@
       transform: scale(1.05);
     }
 
+    /* Animation for new photos */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Download button inside lightbox */
+    #pswp-download {
+      position: fixed;
+      top: 20px;
+      right: 70px;
+      background: #bfa060;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 9999;
+      cursor: pointer;
+      display: none;
     }
   </style>
 </head>
@@ -127,13 +143,19 @@
     <p>Thank you for sharing our beautiful day 💛</p>
   </header>
 
+  <!-- Photo gallery -->
   <div id="previewContainer"></div>
 
+  <!-- Upload button -->
   <button id="uploadButton" class="upload-btn">+</button>
   <input id="fileInput" type="file" multiple>
+
 </div>
 
-<!-- Firebase Config -->
+<!-- Lightbox Download Button -->
+<div id="pswp-download">Download</div>
+
+<!-- Firebase config -->
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyAAOqmYEYPjvoxSogDLHNqMS4CoSXfsrgs",
@@ -143,34 +165,37 @@
     messagingSenderId: "1071327540442",
     appId: "1:1071327540442:web:2f611f8804bd1bd95761e3"
   };
+
   firebase.initializeApp(firebaseConfig);
   const storage = firebase.storage();
 </script>
 
-<!-- Main Script -->
-<script>
-  const MAX_FILE_SIZE = 50 * 1024 * 1024;
+<!-- Upload and gallery logic -->
+<script type="module">
+  import PhotoSwipeLightbox from 'https://unpkg.com/photoswipe@5/dist/photoswipe-lightbox.esm.min.js';
+
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB in bytes
+
   const fileInput = document.getElementById('fileInput');
   const uploadButton = document.getElementById('uploadButton');
   const previewContainer = document.getElementById('previewContainer');
+  const downloadBtn = document.getElementById('pswp-download');
 
-  const lightbox = GLightbox({
-    loop: true,
-    draggable: false,
+  uploadButton.addEventListener('click', () => {
+    fileInput.click();
   });
-
-  uploadButton.addEventListener('click', () => fileInput.click());
 
   fileInput.addEventListener("change", (e) => {
     const files = e.target.files;
-    for (const file of files) {
+    if (files.length > 0) {
+      const file = files[0];
       if (file.size > MAX_FILE_SIZE) {
-        alert(`"${file.name}" is too large! Please select files smaller than 50 MB.`);
-        continue;
+        alert("File is too large! Please select a file smaller than 50 MB.");
+        fileInput.value = "";  // Clear the file input field
+      } else {
+        uploadFile(file);
       }
-      uploadFile(file);
     }
-    fileInput.value = ""; // Reset for next selection
   });
 
   async function uploadFile(file) {
@@ -208,23 +233,50 @@
     const wrapper = document.createElement('div');
     wrapper.className = 'preview-wrapper';
     wrapper.innerHTML = `
-      <a href="${url}" class="glightbox" data-gallery="gallery1" download>
-        <img src="${url}" loading="lazy" oncontextmenu="event.stopPropagation();">
+      <a href="${url}" data-pswp-width="1600" data-pswp-height="1200" target="_blank">
+        <img src="${url}" loading="lazy">
       </a>
     `;
     previewContainer.prepend(wrapper);
-    lightbox.reload();
   }
 
   async function loadPhotos() {
     const storageRef = firebase.storage().ref('wedding-photos/');
     const result = await storageRef.listAll();
     const urls = await Promise.all(result.items.map(item => item.getDownloadURL()));
+
     urls.reverse();
     urls.forEach(url => addPhoto(url));
   }
 
   loadPhotos();
+
+  const lightbox = new PhotoSwipeLightbox({
+    gallery: '#previewContainer',
+    children: 'a',
+    pswpModule: () => import('https://unpkg.com/photoswipe@5/dist/photoswipe.esm.min.js')
+  });
+
+  lightbox.on('afterInit', () => {
+    lightbox.on('change', () => {
+      const currSlide = lightbox.pswp.currSlide.data;
+      if (currSlide) {
+        downloadBtn.style.display = 'block';
+        downloadBtn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = currSlide.src;
+          a.download = currSlide.src.split('/').pop();
+          a.click();
+        };
+      }
+    });
+
+    lightbox.on('close', () => {
+      downloadBtn.style.display = 'none';
+    });
+  });
+
+  lightbox.init();
 </script>
 
 </body>
