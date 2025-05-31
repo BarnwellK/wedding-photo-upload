@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Download All Wedding Photos</title>
 
   <!-- Firebase -->
@@ -70,16 +70,47 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
+    thead input {
+      width: 100%;
+      padding: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
     th, td {
       padding: 12px 10px;
       border-bottom: 1px solid #eee;
       text-align: left;
       font-size: 14px;
+      user-select: none;
     }
 
     th {
       background-color: #fff3dc;
       color: #6e562c;
+      cursor: pointer;
+      position: relative;
+    }
+
+    /* Sort indicators */
+    th.sort-asc::after,
+    th.sort-desc::after {
+      content: '';
+      position: absolute;
+      right: 10px;
+      border: 6px solid transparent;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    th.sort-asc::after {
+      border-bottom-color: #6e562c;
+    }
+
+    th.sort-desc::after {
+      border-top-color: #6e562c;
     }
 
     .thumbnail {
@@ -97,6 +128,8 @@
       border: none;
       border-radius: 5px;
       cursor: pointer;
+      width: 80px;
+      text-align: center;
     }
 
     .download-btn:hover {
@@ -135,15 +168,23 @@
     <table id="fileTable">
       <thead>
         <tr>
-          <th>Thumbnail</th>
-          <th>File Name</th>
-          <th>Type</th>
-          <th>Size</th>
+          <th data-column="thumbnail" data-type="string">Thumbnail</th>
+          <th data-column="name" data-type="string">File Name</th>
+          <th data-column="contentType" data-type="string">Type</th>
+          <th data-column="size" data-type="number">Size (MB)</th>
           <th>Download</th>
+        </tr>
+        <tr id="filterRow">
+          <th></th>
+          <th><input type="text" id="filterName" placeholder="Search name"></th>
+          <th><input type="text" id="filterType" placeholder="Search type"></th>
+          <th><input type="text" id="filterSize" placeholder="Min size"></th>
+          <th></th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
+
   </div>
 
 <script>
@@ -162,32 +203,167 @@
   const zipButton = document.getElementById("zipButton");
 
   let fileList = [];
+  let currentSort = { column: null, order: 'asc' };
 
   async function listFiles() {
     const storageRef = storage.ref('wedding-photos/');
     const result = await storageRef.listAll();
 
+    fileList = [];
+
+    // Collect metadata only first for fast render
     for (const item of result.items) {
-      const url = await item.getDownloadURL();
       const metadata = await item.getMetadata();
 
-      fileList.push({ name: metadata.name, url, size: metadata.size, contentType: metadata.contentType });
+      fileList.push({
+        name: metadata.name,
+        url: null,
+        size: metadata.size,
+        contentType: metadata.contentType,
+        isImage: metadata.contentType.startsWith('image/'),
+      });
+    }
 
-      const isImage = metadata.contentType.startsWith('image/');
-      const thumb = isImage ? `<img src="${url}" class="thumbnail" loading="lazy">` : '—';
+    sortAndRender();
+    loadThumbnails();
+  }
+
+  function renderTable(files) {
+    tableBody.innerHTML = '';
+
+    files.forEach((file, index) => {
+      const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+      const thumbCell = file.isImage ?
+        `<td class="thumbnail-cell" data-index="${index}">Loading...</td>`
+        : '<td>—</td>';
+
+      const downloadCellContent = file.url
+        ? `<a href="${file.url}" target="_blank" rel="noopener" class="download-btn">Open</a>`
+        : `<button class="download-btn" disabled>Loading...</button>`;
 
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td>${thumb}</td>
-        <td>${metadata.name}</td>
-        <td>${metadata.contentType}</td>
-        <td>${(metadata.size / 1024 / 1024).toFixed(2)} MB</td>
-        <td><a href="${url}" target="_blank" rel="noopener"><button class="download-btn">Open</button></a></td>
-
+        ${thumbCell}
+        <td>${file.name}</td>
+        <td>${file.contentType}</td>
+        <td>${sizeMB}</td>
+        <td>${downloadCellContent}</td>
       `;
       tableBody.appendChild(row);
+    });
+  }
+
+  async function loadThumbnails() {
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      if (!file.url) {
+        try {
+          const fileRef = storage.ref('wedding-photos/' + file.name);
+          file.url = await fileRef.getDownloadURL();
+        } catch (error) {
+          console.error('Error getting download URL for', file.name, error);
+          continue;
+        }
+      }
+
+      const row = tableBody.children[i];
+      if (file.isImage) {
+        const thumbCell = row.querySelector('td.thumbnail-cell');
+        if (thumbCell) {
+          thumbCell.innerHTML = `<img src="${file.url}" class="thumbnail" loading="lazy" alt="${file.name}">`;
+        }
+      }
+
+      // Update download button
+      const downloadBtn = row.querySelector('.download-btn');
+      if (downloadBtn) {
+        downloadBtn.outerHTML = `<a href="${file.url}" target="_blank" rel="noopener" class="download-btn">Open</a>`;
+      }
     }
   }
+
+
+
+  const filters = {
+    name: '',
+    contentType: '',
+    size: ''
+  };
+
+  // Hook up filters
+  document.getElementById('filterName').addEventListener('input', e => {
+    filters.name = e.target.value.toLowerCase();
+    filterAndSort();
+  });
+
+  document.getElementById('filterType').addEventListener('input', e => {
+    filters.contentType = e.target.value.toLowerCase();
+    filterAndSort();
+  });
+
+  document.getElementById('filterSize').addEventListener('input', e => {
+    filters.size = e.target.value.trim();
+    filterAndSort();
+  });
+
+  function applyFilters(files) {
+    return files.filter(file => {
+      const nameMatch = file.name.toLowerCase().includes(filters.name);
+      const typeMatch = file.contentType.toLowerCase().includes(filters.contentType);
+      const sizeMatch = filters.size === '' || (file.size / 1024 / 1024) >= parseFloat(filters.size);
+      return nameMatch && typeMatch && sizeMatch;
+    });
+  }
+
+  function filterAndSort() {
+    let filtered = applyFilters(fileList);
+    if (currentSort.column) {
+      const { column, order } = currentSort;
+      const type = document.querySelector(`th[data-column="${column}"]`)?.getAttribute('data-type') || 'string';
+
+      filtered.sort((a, b) => {
+        let valA = a[column];
+        let valB = b[column];
+        if (type === 'number') {
+          valA = Number(valA);
+          valB = Number(valB);
+        } else {
+          valA = valA?.toString().toLowerCase() || '';
+          valB = valB?.toString().toLowerCase() || '';
+        }
+        return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      });
+    }
+    renderTable(filtered);
+    loadThumbnails();
+  }
+
+  function sortAndRender(column = currentSort.column, order = currentSort.order) {
+    currentSort.column = column;
+    currentSort.order = order;
+    document.querySelectorAll('#fileTable th').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc');
+    });
+    const activeTh = document.querySelector(`#fileTable th[data-column="${column}"]`);
+    if (activeTh) {
+      activeTh.classList.add(order === 'asc' ? 'sort-asc' : 'sort-desc');
+    }
+    filterAndSort();
+  }
+
+  // Add click event listeners on headers for sorting
+  document.querySelectorAll('#fileTable th[data-column]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.getAttribute('data-column');
+      let order = 'asc';
+
+      if (currentSort.column === col && currentSort.order === 'asc') {
+        order = 'desc';
+      }
+
+      sortAndRender(col, order);
+    });
+  });
 
   zipButton.addEventListener('click', async () => {
     zipButton.disabled = true;
@@ -197,9 +373,14 @@
     const folder = zip.folder("wedding-photos");
 
     for (const file of fileList) {
-      const response = await fetch(file.url);
-      const blob = await response.blob();
-      folder.file(file.name, blob);
+      if (!file.url) continue;
+      try {
+        const response = await fetch(file.url);
+        const blob = await response.blob();
+        folder.file(file.name, blob);
+      } catch (error) {
+        console.error('Error fetching file for zip:', file.name, error);
+      }
     }
 
     const content = await zip.generateAsync({ type: "blob" });
