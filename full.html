@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Download All Wedding Photos</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+
+  <!-- JSZip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: url('https://images.unsplash.com/photo-1636632519127-c6e09af4a3b5?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center fixed;
+      background-size: cover;
+      background-color: #fff8f0;
+      min-height: 100vh;
+    }
+
+    .overlay {
+      background: rgba(255, 248, 240, 0.95);
+      backdrop-filter: blur(2px);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 40px 20px 20px;
+      font-family: 'Georgia', serif;
+      color: #bfa060;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2.5em;
+      letter-spacing: 2px;
+    }
+
+    header p {
+      margin-top: 10px;
+      font-size: 1.1em;
+      color: #a88b5b;
+    }
+
+    #zipButton {
+      margin: 20px auto;
+      display: block;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #bfa060;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+      background-color: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background-color: #fff3dc;
+      color: #6e562c;
+    }
+
+    .thumbnail {
+      width: 60px;
+      height: auto;
+      border-radius: 6px;
+      object-fit: cover;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .download-btn {
+      padding: 6px 12px;
+      background-color: #bfa060;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .download-btn:hover {
+      background-color: #a88b5b;
+    }
+
+    @media (max-width: 768px) {
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
+
+      th, td {
+        padding: 10px;
+      }
+
+      td {
+        border: none;
+        border-bottom: 1px solid #eee;
+      }
+
+      tr {
+        margin-bottom: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <header>
+      <h1>Wedding Photo Downloads</h1>
+      <p>Download individual files or all as a ZIP 📁</p>
+    </header>
+
+    <button id="zipButton">Download All as ZIP</button>
+
+    <table id="fileTable">
+      <thead>
+        <tr>
+          <th>Thumbnail</th>
+          <th>File Name</th>
+          <th>Type</th>
+          <th>Size</th>
+          <th>Download</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAAOqmYEYPjvoxSogDLHNqMS4CoSXfsrgs",
+    authDomain: "ken-and-dee-wedding-photos.firebaseapp.com",
+    projectId: "ken-and-dee-wedding-photos",
+    storageBucket: "ken-and-dee-wedding-photos.firebasestorage.app",
+    messagingSenderId: "1071327540442",
+    appId: "1:1071327540442:web:2f611f8804bd1bd95761e3"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const storage = firebase.storage();
+  const tableBody = document.querySelector("#fileTable tbody");
+  const zipButton = document.getElementById("zipButton");
+
+  let fileList = [];
+
+  async function listFiles() {
+    const storageRef = storage.ref('wedding-photos/');
+    const result = await storageRef.listAll();
+
+    for (const item of result.items) {
+      const url = await item.getDownloadURL();
+      const metadata = await item.getMetadata();
+
+      fileList.push({ name: metadata.name, url, size: metadata.size, contentType: metadata.contentType });
+
+      const isImage = metadata.contentType.startsWith('image/');
+      const thumb = isImage ? `<img src="${url}" class="thumbnail" loading="lazy">` : '—';
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${thumb}</td>
+        <td>${metadata.name}</td>
+        <td>${metadata.contentType}</td>
+        <td>${(metadata.size / 1024 / 1024).toFixed(2)} MB</td>
+        <td><a href="${url}" download><button class="download-btn">Download</button></a></td>
+      `;
+      tableBody.appendChild(row);
+    }
+  }
+
+  zipButton.addEventListener('click', async () => {
+    zipButton.disabled = true;
+    zipButton.textContent = "Zipping...";
+
+    const zip = new JSZip();
+    const folder = zip.folder("wedding-photos");
+
+    for (const file of fileList) {
+      const response = await fetch(file.url);
+      const blob = await response.blob();
+      folder.file(file.name, blob);
+    }
+
+    const content = await zip.generateAsync({ type: "blob" });
+    saveAs(content, "ken-dee-wedding-photos.zip");
+
+    zipButton.textContent = "Download All as ZIP";
+    zipButton.disabled = false;
+  });
+
+  listFiles();
+</script>
+</body>
+</html>
