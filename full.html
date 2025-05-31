@@ -182,7 +182,8 @@
         <td>${metadata.name}</td>
         <td>${metadata.contentType}</td>
         <td>${(metadata.size / 1024 / 1024).toFixed(2)} MB</td>
-        <td><a href="${url}" download><button class="download-btn">Download</button></a></td>
+        <td><a href="${url}" target="_blank" rel="noopener"><button class="download-btn">Open</button></a></td>
+
       `;
       tableBody.appendChild(row);
     }
