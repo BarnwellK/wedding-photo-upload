@@ -205,28 +205,56 @@
   let fileList = [];
   let currentSort = { column: null, order: 'asc' };
 
+
   async function listFiles() {
     const storageRef = storage.ref('wedding-photos/');
     const result = await storageRef.listAll();
 
-    fileList = [];
-
-    // Collect metadata only first for fast render
     for (const item of result.items) {
-      const metadata = await item.getMetadata();
+      try {
+        const [url, metadata] = await Promise.all([
+          item.getDownloadURL(),
+          item.getMetadata()
+        ]);
 
-      fileList.push({
-        name: metadata.name,
-        url: null,
-        size: metadata.size,
-        contentType: metadata.contentType,
-        isImage: metadata.contentType.startsWith('image/'),
-      });
+        const fileData = {
+          name: metadata.name,
+          url,
+          size: metadata.size,
+          contentType: metadata.contentType
+        };
+
+        fileList.push(fileData);
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="thumb-cell">Loading...</td>
+          <td>${fileData.name}</td>
+          <td>${fileData.contentType}</td>
+          <td>${(fileData.size / 1024 / 1024).toFixed(2)} MB</td>
+          <td><a href="${fileData.url}" target="_blank" rel="noopener"><button class="download-btn">Open</button></a></td>
+        `;
+        tableBody.appendChild(row);
+
+        // Lazy-load the thumbnail after row is rendered
+        const isImage = fileData.contentType.startsWith('image/');
+        if (isImage) {
+          const img = document.createElement('img');
+          img.src = fileData.url;
+          img.className = 'thumbnail';
+          img.loading = 'lazy';
+
+          row.querySelector('.thumb-cell').innerHTML = '';
+          row.querySelector('.thumb-cell').appendChild(img);
+        } else {
+          row.querySelector('.thumb-cell').textContent = '—';
+        }
+      } catch (err) {
+        console.error('Error loading file metadata:', err);
+      }
     }
-
-    sortAndRender();
-    loadThumbnails();
   }
+
 
   function renderTable(files) {
     tableBody.innerHTML = '';
