@@ -263,7 +263,7 @@
   const result = await storageRef.listAll();
   const urls = await Promise.all(result.items.map(item => item.getDownloadURL()));
 
-  urls.reverse();
+//  urls.reverse();
 
   urls.forEach(url => {
     const isHEIC = url.toLowerCase().includes('.heic') || url.toLowerCase().includes('.heif');
